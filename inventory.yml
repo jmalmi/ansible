@@ -1,0 +1,15 @@
+- name: Gather facts from mongo
+  hosts: _mongo
+  tasks:
+    - name: Gather facts
+      setup:
+- name: Use haproxy server facts in other server setup
+  hosts: _backend
+  tasks:
+    - name: debug
+      debug:
+        msg: "{{ hostvars[groups['_mongo'][0]] }}"
+    - name: Create dummy file with other machine ip
+      copy:
+        dest: /tmp/mongo-ip.txt
+        content: "{{ hostvars[groups['_mongo'][0]].ansible_default_ipv4.address }}"
