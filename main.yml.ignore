@@ -101,7 +101,6 @@
      
 # DEPLOYMENTS
 
-# install docker for all instances
 - name: Install docker for all
   hosts:
     - _frontend
@@ -185,13 +184,13 @@
         
     - name: Pull realworld-backend
       docker_image:
-        name: eu.gcr.io/mok-project/realword_backend
+        name: eu.gcr.io/mok-project/realworld_backend
         source: pull
         
     - name: Run backend-container
       docker_container:
         name: backend
-        image: eu.gcr.io/mok-project/realword_backend
+        image: eu.gcr.io/mok-project/realworld_backend
         ports:
           - "80:3000"
         env:
@@ -217,13 +216,13 @@
         
     - name: Pull realworld-frontend
       docker_image:
-        name: eu.gcr.io/mok-project/realword_frontend
+        name: eu.gcr.io/mok-project/realworld_frontend
         source: pull
         
     - name: Run frontend-container
       docker_container:
         name: frontend
-        image: eu.gcr.io/mok-project/realword_frontend
+        image: eu.gcr.io/mok-project/realworld_frontend
         ports:
           - "80:4100"
         env:

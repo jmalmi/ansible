@@ -1,0 +1,142 @@
+- name: Create instance(s)
+  hosts: localhost
+  connection: local
+  gather_facts: no
+
+  vars:
+    credentials_file: ~/secret/ansible-service-account.json
+    project_id: mok-project
+    machine_type: e2-small
+    image: projects/ubuntu-os-cloud/global/images/family/ubuntu-2004-lts
+    zone: europe-north1-a
+    compute_engine_default_service_account: 1032823057839-compute@developer.gserviceaccount.com
+  tasks:
+    - name: Launch instances
+      gcp_compute_instance:
+        auth_kind: serviceaccount
+        name: realworld-mongo
+        machine_type: "{{ machine_type }}"
+        disks:
+          - auto_delete: true
+            boot: true
+            initialize_params:
+              source_image: "{{ image }}"
+        network_interfaces:
+          - access_configs:
+            - name: External NAT
+              type: ONE_TO_ONE_NAT
+        service_account_file: "{{ credentials_file }}"
+        project: "{{ project_id }}"
+        zone: "{{ zone }}"
+        service_accounts:
+          - email: "{{ compute_engine_default_service_account }}"
+            scopes:
+              - https://www.googleapis.com/auth/devstorage.read_only
+    - name: Launch instances
+      gcp_compute_instance:
+        auth_kind: serviceaccount
+        name: realworld-backend
+        machine_type: "{{ machine_type }}"
+        disks:
+          - auto_delete: true
+            boot: true
+            initialize_params:
+              source_image: "{{ image }}"
+        network_interfaces:
+          - access_configs:
+            - name: External NAT
+              type: ONE_TO_ONE_NAT
+        service_account_file: "{{ credentials_file }}"
+        project: "{{ project_id }}"
+        zone: "{{ zone }}"
+        service_accounts:
+          - email: "{{ compute_engine_default_service_account }}"
+            scopes:
+              - https://www.googleapis.com/auth/devstorage.read_only
+        tags:
+          items:
+            - http-server
+            - https-server
+    - name: Launch instances
+      gcp_compute_instance:
+        auth_kind: serviceaccount
+        name: realworld-frontend
+        machine_type: "{{ machine_type }}"
+        disks:
+          - auto_delete: true
+            boot: true
+            initialize_params:
+              source_image: "{{ image }}"
+        network_interfaces:
+          - access_configs:
+            - name: External NAT
+              type: ONE_TO_ONE_NAT
+        service_account_file: "{{ credentials_file }}"
+        project: "{{ project_id }}"
+        zone: "{{ zone }}"
+        service_accounts:
+          - email: "{{ compute_engine_default_service_account }}"
+            scopes:
+              - https://www.googleapis.com/auth/devstorage.read_only
+        tags:
+          items:
+            - http-server
+            - https-server
+    - name: Refresh inventory
+      meta: refresh_inventory
+
+
+- name: Configure mongo
+  hosts: _realworld_mongo
+  become: true
+  roles:
+    - docker
+  tasks:
+    - name: Create mongo container
+      docker_container:
+        name: mongo
+        image: mongo
+        volumes:
+          - "mongo-volume:/data/db"
+        ports:
+          - "27017:27017"
+
+- name: Configure backend
+  hosts: _realworld_backend
+  become: true
+  roles:
+    - docker
+    - gcr-authenticate
+  vars:
+    realworld_secret: "something-super-secret"
+  tasks:
+    - name: Create backend container
+      docker_container:
+        name: realworld-backend
+        image: eu.gcr.io/mok-project/realworld_backend
+        ports:
+          - "80:3000"
+        env:
+          SECRET: "{{ realworld_secret }}"
+          MONGODB_URI: 'mongodb://{{ hostvars[groups["_realworld_mongo"][0]].ansible_facts.fqdn }}/conduit'
+          NODE_ENV: production
+
+- name: Configure frontend
+  hosts: _realworld_frontend
+  become: true
+  roles:
+    - docker
+    - gcr-authenticate
+  tasks:
+    - name: Debug
+      debug:
+        msg: "http://{{ hostvars[groups['_realworld_backend'][0]].inventory_hostname }}/api"
+    - name: Create frontend container
+      docker_container:
+        name: realworld-frontend
+        image: eu.gcr.io/mok-project/realworld_frontend
+        ports:
+          - "80:4100"
+        env:
+          REACT_APP_API_ROOT: "http://{{ hostvars[groups['_realworld_backend'][0]].inventory_hostname }}/api"
+
